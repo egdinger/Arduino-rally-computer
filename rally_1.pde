@@ -3,12 +3,13 @@
 #include <EEPROM_UTIL.h>
 #include <Keypad.h>
 
+enum { i = 1, f};
 //The following structs define the two types of odo's
 //that will be used, countUp and countDown
 //countUp will count up from 0
 struct countUp
 {
-  long startPulses;
+  unsigned long startPulses;
 };
 
 //countDown will be the same as countup
@@ -16,7 +17,7 @@ struct countUp
 //This will be used as a countdown timer.
 struct countDown
 {
-  long startPulses;
+  unsigned long startPulses;
   float startDistance;
 };
 
@@ -30,7 +31,6 @@ const unsigned INCH_IN_MILE = 63360;
 const float pi = 3.14;
 
 //Pin values general
-const int RESET = 2; //Does need to be on an interupt pin, will rewrite so that it does not!
 const int PULSE = 3; //Needs to be on an interupt pin
 //Pin values for lcd
 const int rs = 4;
@@ -40,13 +40,14 @@ const int d5 = 7;
 const int d6 = 8;
 const int d7 = 9;
 // pin values for matrix keypad
+//These are named funny because thats what they are labeled on the keypad
+//I'm using a greyhill 87BB3-201
 const int D = 18;
 const int E = 19;
 const int P = 16;
 const int Q = 17;
 const int M = 14;
-const int N = 15;
-const int G = 12;
+const int N = 15;const int G = 12;
 const int F = 13;
 
 
@@ -70,7 +71,7 @@ countUp odo1;
 countDown odo2;
 
 //Various variables
-unsigned long ulPulseCount; //The total number of pulses that have occured since the last total reset. I have this as an
+volatile unsigned long ulPulseCount; //The total number of pulses that have occured since the last total reset. I have this as an
 // unsigned becuase in this implementation it is an error if ulPulseCount goes negative.
 byte bPpr; //The number of pulses per revolution. Since I'm basing this off a sensor that reads the number of lug studs
 //This is very unlikely to be greater than 8. But since it may be used with the vehicles existing vss it could be higher.
@@ -79,6 +80,7 @@ float fDistancePerPulse; //This will be a calculated value.
 //float fTire; //Tire diameter, read from the eeprom
 float fCirc; //calc'ed
 float fTemp; //used as a temp accumulator
+byte bTemp; //used as a temp accumlator
 byte bCurrentOdo; //Which is the current odo we have selected
 byte bPage; //Which is the current lcd data page we want to display
 byte bEditMode; //Used to indicate if we want to edit data on the lcd screen
@@ -91,21 +93,19 @@ Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 
 //Function definitions, look below for more extensive documentation
 void pulseHandler();
-void resetHandler();
+//void resetHandler();
 void calDisplay(float fTire);
 void saveCalibration();
 void updateLED(int odo);
 void updateLCD();
-float calcCurrentSpeed(long pt);
+int calcCurrentSpeed(long pt);
 void buttonHandler(char key);
 
 void setup()
 {
   float fTire; //Tire diameter, read from the eeprom
   
-  pinMode(RESET, INPUT);
   pinMode(PULSE, INPUT);
-  digitalWrite(RESET, HIGH);
   digitalWrite(PULSE, HIGH);
   
   ulPulseCount = 0; //depreciated. Value is stored so it can be persistant across power cycles.
@@ -141,7 +141,6 @@ void setup()
   
   //Attach the interupt handlers. We do this last so no interupts occur while we are setting up the system.
   attachInterrupt(1, pulseHandler, FALLING);
-  attachInterrupt(0, resetInterrupt, FALLING);
 }
 
 void loop()
@@ -149,7 +148,7 @@ void loop()
   int iDisplayCounter = 0;
   char key;
   
-  if ((iDisplayCounter % 20) == 0) //Limit the refresh rate of the lcd
+  if ((iDisplayCounter % 30) == 0) //Limit the refresh rate of the lcd
   {
     //update the LED
     //updateLED(bCurrentOdo);
@@ -172,8 +171,7 @@ void loop()
 //Displays over serial and on the LCD
 void calDisplay(float fTire)
 {
-  //Doing this with serial for now,
-  //Later should move to LCD screen
+  //Doing this with serial and lcd
   Serial.print("Tire Diameter: ");
   Serial.println(fTire);
   Serial.print("PPR: ");
@@ -197,15 +195,25 @@ void pulseHandler()
 }
 
 //Resets the current odo
-void resetInterrupt()
+void resetCurrentOdo()
 {
+  Serial.println("in reset");
   switch (bCurrentOdo)
   {
+    case 0:
+      //Not resetable here
+      break;
     case 1: //ODO1
+      cli();
+      Serial.println(odo1.startPulses, DEC);
       odo1.startPulses = ulPulseCount;
+      Serial.println(odo1.startPulses, DEC);
+      sei();
       break;
     case 2: //odo 2
+      cli();
       odo2.startPulses = ulPulseCount;
+      sei();
       break;
   }
 }
@@ -214,12 +222,14 @@ void resetInterrupt()
 //Once this has been done it cannot be undone.
 void masterReset()
 {
+  cli();
   ulPulseCount = 0;
   odo1.startPulses = ulPulseCount;
   odo2.startPulses = ulPulseCount;
   odoTotal.startPulses = ulPulseCount;
   lcd.clear();
   lcd.print("Master reset");
+  sei();
   delay(2000);
 }
 
@@ -228,43 +238,49 @@ void masterReset()
 void updateLED(int odo)
 {
   //Compute the distance traveled
-  float distance = 0.0; //((ulPulseCount/bPpr) * fTire) / INCH_IN_MILE;
+  float distance;
   int tPulseCount;
   switch (odo)
   {
     case 0:
-      tPulseCount = (ulPulseCount - odoTotal.startPulses);
-      distance = (tPulseCount * fDistancePerPulse) / INCH_IN_MILE;
+      distance = ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / INCH_IN_MILE;
       break;
     case 1:
       //Count up
-      tPulseCount = (ulPulseCount - odo1.startPulses);
-      distance = (tPulseCount * fDistancePerPulse) / INCH_IN_MILE;
+      distance = ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / INCH_IN_MILE;
       break;
     case 2:
       //Count down
-      tPulseCount = (ulPulseCount - odo2.startPulses);
-      distance = odo2.startDistance - (tPulseCount * fDistancePerPulse) / INCH_IN_MILE;
+      distance = odo2.startDistance - ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / INCH_IN_MILE;
       break;
   }
-
-  Serial.print(ulPulseCount);
-  Serial.print(" ");
-  Serial.println(distance, 2);
 }
 
 //Prints less important data to the lcd
 void updateLCD()
 {
-  //what should be on the lcd it will be a 16x2
-  //123456789ABCDEF
-  //ODO DOWN   
-  //  1 43.44 
-  //ODO will list the number of the selected odo or DWN or total
-  //Up will show the last selected count down value
+  cli();
+  unsigned long ulTempCount = ulPulseCount;
+  sei();
+  
+  //Using a 20x4 lcd will look something like
+  //Page 0
+  //ODO TOT: xxx.xx
+  //ODO   1: xx.xx
+  //ODO DWN: xx.xx
+  //XXX
+  //Page 1
+  //Unsure
+  //Page 2
+  //1: Configuration
+  //2: Master Reset
+  //3: Don't know if these will be useful
+  //4: Ditto
   switch(bPage)
   {
     case 0:
+      //The first page will display all of the available odo's and some information about them
+      //Not sure if I want to display the count or what we want to count down from for count down
       lcd.setCursor(0,0);
       lcd.print("ODO TOT:");
       lcd.setCursor(9,0);
@@ -272,9 +288,9 @@ void updateLCD()
       lcd.setCursor(0,1);
       lcd.print("ODO   1:");
       lcd.setCursor(9,1);
-      lcd.print(ulPulseCount - odo1.startPulses);
+      lcd.print(((ulTempCount - odo1.startPulses) * fDistancePerPulse / INCH_IN_MILE));
       lcd.setCursor(0,2);
-      lcd.print("ODO  UP:");
+      lcd.print("ODO DWN:");
       if (bEditMode)
       {
         lcd.setCursor(8,2);
@@ -284,12 +300,20 @@ void updateLCD()
       else
       {
         lcd.setCursor(9,2);
-        lcd.print(odo2.startDistance);
+        //Do I want to count down here, or only on the led?
+        //        lcd.print(odo2.startDistance);
+        lcd.print(odo2.startDistance - ((ulTempCount - odo2.startPulses) * fDistancePerPulse / INCH_IN_MILE));
       }
       break;
     case 1:
       lcd.setCursor(0,0);
-      lcd.print("page1");
+      lcd.print("Debug Stuff:");
+      lcd.setCursor(0,1);
+      lcd.print(ulPulseCount);
+      lcd.setCursor(0,2);
+      lcd.print("Selected ODO:");
+      lcd.setCursor(14,2);
+      lcd.print(bCurrentOdo, DEC);
       break;
     case 2:
       lcd.setCursor(0,0);
@@ -302,55 +326,49 @@ void updateLCD()
         lcd.print("^");
       }
       break;
+    case 3:
+      //The calibration menu
+      lcd.setCursor(0,0);
+      lcd.print("Pulses per rev:");
+      lcd.setCursor(15,0);
+      if(bEditMode == i)
+      {
+        lcd.print("^");
+        lcd.print(bTemp, DEC);
+      }
+      else
+      {
+        lcd.print(bPpr, DEC);
+      }
+      
+      lcd.setCursor(0,1);
+      lcd.print("Tire diameter:");
+      lcd.setCursor(14,1);
+      if(bEditMode == f)
+      {
+        lcd.print("^");
+        lcd.print(fTemp);
+      }
+      else
+      {
+        //lcd.print(fTire);
+      }
+      break;
   }
-  /*switch (bCurrentOdo)
-  {
-    case 0: //Total Milage
-      lcd.print("TOT");
-      break;
-    case 1: //first count up odo
-      lcd.print("  1");
-      break;
-    case 2: //first count down odo
-      lcd.print("DWN");
-      break;
-  }
-  lcd.setCursor(4,1);
-  //Should be in a switch statement, but since we only have 1 count up it doesn't matter yet.
-  lcd.print(odo2.startDistance);*/
+  //Do I want to display the current speed here all the time?
   lcd.setCursor(0,3);
-  lcd.print(calcCurrentSpeed(uiPulseInt),2);
+  lcd.print(calcCurrentSpeed(uiPulseInt), DEC);
 }
 
 //Calculates the current speed with pulse time given in microseconds
 //returns speed in mph
-float calcCurrentSpeed(long pt)
+int calcCurrentSpeed(long pt)
 {
-  //5681.81 is a magic number
+  //56818.1 is a magic number
   //It is the conversion factor from inches/uSec to mph
-  return ((20.8/pt)*5681.81);
-}
-
-void calibrateMenu()
-{
-  bool control = true;
-  lcd.setCursor(0,0);
-  lcd.print("PPR  Tire Dia");
-  lcd.setCursor(0,1);
-  while (control)
-  {
-    lcd.print(bPpr);
-    //get nunchuck data
-    //if nunchuck x is up increment bPpr
-    //if z is pushed switch to tire size
-    //if nunchuck x is up halfway increment fTire by .1
-    //if nunchuck x is greater than halfway up
-    //increment fTire by 1.0
-    //delay by something, 50?
-    //if other nunchuck button is pressed, 
-    //control = false;
-  }
-  saveCalibration();
+  //20.8 is tire circumfrance / ppr
+  //should calc this!
+  return ((20.8/pt)*56818.1);
 }
 
 //Uses prompts to get data from the user and then
@@ -367,88 +385,116 @@ void buttonHandler(char key)
   switch (key)
   {
     case '1':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .01;     
       }
+      if(bPage == 2 && bEditMode == true)
+      {
+        bPage = 3;
+        bEditMode = false;//!bEditMode;
+        lcd.clear();
+        Serial.println("In here");
+      }
       break;
     case '2':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .02;
       }
       if(bPage == 2 && bEditMode == true)
       {
         masterReset();
-        bEditMode = !bEditMode;
+        bEditMode = false;//!bEditMode;
       }
       break;
     case '3':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .03;
       }
       break;
     case '4':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .04;
       }
       break;
     case '5':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .05;
       }
       break;
     case '6':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .06;
       }
       break;
     case '7':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .07;
       }
       break;
     case '8':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .08;
       }
       break;
     case '9':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .09;
       }
       break;
     case '0':
-      if(bPage == 0 && bEditMode == true)
+      if(bPage == 0 || bPage == 4 && bEditMode == true)
       {
         fTemp = fTemp * 10 + .00;
       }
       break;
     case 'a':
       //Can't change pages when you are editing
-      if(!bEditMode)
+      if(bEditMode && bPage == 3)
+      {
+        bEditMode = (++bEditMode % 2) + 1;
+        lcd.clear();
+      }
+      else
       {
         bPage = (bPage + 1) % 3;
         lcd.clear();
       }
       break;
     case 'b':
+      //swap the current/active odometer
+      //This means the one displayed on the LED display also the one affected by reset
+      bCurrentOdo = (++bCurrentOdo % 3);
+      break;
     case 'c':
     case 'd':
+      resetCurrentOdo();
       break;
     case '#':
       //enter edit mode
-      if(bEditMode)
+
+      if(bPage == 0 && bEditMode)
       {
-        //We are in edit mode so clear any unsaved value
+        odo2.startDistance = fTemp;
         fTemp = 0;
+      }
+      if(bPage == 0 && bEditMode == f)
+      {
+        //odo2.startDistance = fTemp;
+        fTemp = 0;
+      }
+      if(bPage == 0 && bEditMode == i)
+      {
+        bPpr = bTemp;
+        bTemp = 0;
       }
       bEditMode = !bEditMode;
       lcd.clear();
@@ -457,11 +503,9 @@ void buttonHandler(char key)
       //Commit change
       if(bEditMode)
       {
-        if(bPage == 0)
-          {
-            odo2.startDistance = fTemp;
-            fTemp = 0;
-          }
+         //We are in edit mode so clear any unsaved value
+         fTemp = 0;
+         bTemp = 0;
          //exit edit mode
          bEditMode = !bEditMode;
          lcd.clear();

@@ -3,7 +3,7 @@
 #include <EEPROM_UTIL.h>
 #include <Keypad.h>
 
-enum { i = 1, f};
+enum { i, f};
 //The following structs define the two types of odo's
 //that will be used, countUp and countDown
 //countUp will count up from 0
@@ -25,6 +25,12 @@ struct countDown
 const unsigned PPR_LOC = 0; //pulse per revolutions
 const unsigned TIRE_SIZE_LOC = 4; //Tire size stored as a float packed into bytes
 const unsigned LPULSECOUNT_LOC = 8; //ulPulseCount is stored here when the unit is turned off, packed into bytes.
+//Locations of the data of the odo's this is so they can be persistant.
+const unsigned ODO_TOT_START_PULSES_LOC = 12;
+const unsigned ODO_1_START_PULSES_LOC = 16;
+const unsigned ODO_DWN_START_PULSES_LOC = 20;
+const unsigned ODO_DWN_START_DISTANCE_LOC = 24;
+const unsigned UL_PULSE_COUNT_LOC = 28;
 
 //Some conversion values used in the program
 const unsigned INCH_IN_MILE = 63360;
@@ -77,16 +83,17 @@ byte bPpr; //The number of pulses per revolution. Since I'm basing this off a se
 //This is very unlikely to be greater than 8. But since it may be used with the vehicles existing vss it could be higher.
 //64 would not be unlikely when used in this way.
 float fDistancePerPulse; //This will be a calculated value.
-//float fTire; //Tire diameter, read from the eeprom
+float fTire; //Tire diameter, read from the eeprom
 float fCirc; //calc'ed
 float fTemp; //used as a temp accumulator
 byte bTemp; //used as a temp accumlator
 byte bCurrentOdo; //Which is the current odo we have selected
 byte bPage; //Which is the current lcd data page we want to display
 byte bEditMode; //Used to indicate if we want to edit data on the lcd screen
+byte bEditWhat; //Used to indicate what we want to edit, if there is more than 1 editable field on the page
 byte bCurSpeed; //I've alrealy forgotten what this was for.
-unsigned long ulOldMicros;
-unsigned int uiPulseInt;
+volatile unsigned long ulOldMicros;
+volatile unsigned int uiPulseInt;
 
 LiquidCrystal lcd(4, 5, 6, 7, 8, 9);
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
@@ -94,32 +101,25 @@ Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 //Function definitions, look below for more extensive documentation
 void pulseHandler();
 //void resetHandler();
-void calDisplay(float fTire);
+void calDisplay();
 void saveCalibration();
 void updateLED(int odo);
 void updateLCD();
 int calcCurrentSpeed(long pt);
 void buttonHandler(char key);
+void shutdownHandler();
+void getPersitantData();
 
 void setup()
-{
-  float fTire; //Tire diameter, read from the eeprom
-  
+{  
   pinMode(PULSE, INPUT);
   digitalWrite(PULSE, HIGH);
   
-  ulPulseCount = 0; //depreciated. Value is stored so it can be persistant across power cycles.
-  //EEPROM_readAnything(LPULSECOUNT_LOC, ulPulseCount);
   bCurrentOdo = 1; //Default odo
   bPage = 0;
   fTemp = .00;
-  odoTotal.startPulses = ulPulseCount; //Restore total distance
-  odo1.startPulses = 0; //reset the odo's, should these also be persistant? Will know after some testing
-  odo2.startPulses = 0; //0's may not be the correct value here, may need to be ulPulseCount
-  odo2.startDistance = 0;
+  getPersitantData();
   ulOldMicros = micros();
-  bPpr = EEPROM.read(PPR_LOC); //Get the stored value for ppr
-  EEPROM_readAnything(TIRE_SIZE_LOC, fTire); //Get the stored value for the tire size
   
   //Calculate the tire circumfrance and the distance per pulse
   fCirc = fTire * pi;
@@ -132,7 +132,7 @@ void setup()
   
   Serial.begin(9600);
   lcd.begin(20,4);
-  calDisplay(fTire);
+  calDisplay();
   delay(2000); //Wait two seconds so the user can see the configuration data on the lcd screen
   
   //The following is an idea that may happen, may scrap the wii nunchuck and go with a matrix keypad.
@@ -169,7 +169,7 @@ void loop()
 
 //Displays the values of the calibration data
 //Displays over serial and on the LCD
-void calDisplay(float fTire)
+void calDisplay()
 {
   //Doing this with serial and lcd
   Serial.print("Tire Diameter: ");
@@ -224,13 +224,14 @@ void masterReset()
 {
   cli();
   ulPulseCount = 0;
+  sei();
   odo1.startPulses = ulPulseCount;
   odo2.startPulses = ulPulseCount;
   odoTotal.startPulses = ulPulseCount;
   lcd.clear();
   lcd.print("Master reset");
-  sei();
   delay(2000);
+  lcd.clear();
 }
 
 //This function performs the calculations on the data and
@@ -304,6 +305,8 @@ void updateLCD()
         //        lcd.print(odo2.startDistance);
         lcd.print(odo2.startDistance - ((ulTempCount - odo2.startPulses) * fDistancePerPulse / INCH_IN_MILE));
       }
+      lcd.setCursor(13, bCurrentOdo);
+      lcd.print("@");
       break;
     case 1:
       lcd.setCursor(0,0);
@@ -316,13 +319,15 @@ void updateLCD()
       lcd.print(bCurrentOdo, DEC);
       break;
     case 2:
-      lcd.setCursor(0,0);
+      lcd.setCursor(1,0);
       lcd.print("1: Configuration");
-      lcd.setCursor(0,1);
+      lcd.setCursor(1,1);
       lcd.print("2: Master Reset");
+      lcd.setCursor(1,2);
+      lcd.print("3: Shutdown");
       if (bEditMode)
       {
-        lcd.setCursor(0,2);
+        lcd.setCursor(0,1);
         lcd.print("^");
       }
       break;
@@ -331,7 +336,7 @@ void updateLCD()
       lcd.setCursor(0,0);
       lcd.print("Pulses per rev:");
       lcd.setCursor(15,0);
-      if(bEditMode == i)
+      if(bEditWhat == i && bEditMode)
       {
         lcd.print("^");
         lcd.print(bTemp, DEC);
@@ -344,14 +349,14 @@ void updateLCD()
       lcd.setCursor(0,1);
       lcd.print("Tire diameter:");
       lcd.setCursor(14,1);
-      if(bEditMode == f)
+      if(bEditWhat == f && bEditMode)
       {
         lcd.print("^");
         lcd.print(fTemp);
       }
       else
       {
-        //lcd.print(fTire);
+        lcd.print(fTire);
       }
       break;
   }
@@ -368,7 +373,8 @@ int calcCurrentSpeed(long pt)
   //It is the conversion factor from inches/uSec to mph
   //20.8 is tire circumfrance / ppr
   //should calc this!
-  return ((20.8/pt)*56818.1);
+  //return ((20.8/pt)*56818.1);
+  return ((fDistancePerPulse/pt)*56818.1);
 }
 
 //Uses prompts to get data from the user and then
@@ -377,7 +383,9 @@ int calcCurrentSpeed(long pt)
 void saveCalibration()
 {
   EEPROM.write(PPR_LOC, bPpr);
-  //EEPROM_writeAnything(TIRE_SIZE_LOC, fTire);
+  EEPROM_writeAnything(TIRE_SIZE_LOC, fTire);
+  lcd.clear();
+  lcd.print("Calibration saved");
 }
 
 void buttonHandler(char key)
@@ -385,22 +393,27 @@ void buttonHandler(char key)
   switch (key)
   {
     case '1':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .01;     
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .01;  
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 1;   
       }
       if(bPage == 2 && bEditMode == true)
       {
         bPage = 3;
-        bEditMode = false;//!bEditMode;
+        bEditMode = !bEditMode;
         lcd.clear();
-        Serial.println("In here");
       }
       break;
     case '2':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .02;
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .02;
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 2;
       }
       if(bPage == 2 && bEditMode == true)
       {
@@ -409,61 +422,95 @@ void buttonHandler(char key)
       }
       break;
     case '3':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .03;
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .03;
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 3;
+      }
+      if(bPage == 2 && bEditMode == true)
+      {
+        shutdownHandler();
+        bEditMode = false;//!bEditMode;
       }
       break;
     case '4':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .04;
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .04;
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 4;
       }
       break;
     case '5':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .05;
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .05;
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 5;
       }
       break;
     case '6':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .06;
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .06;
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 6;
       }
       break;
     case '7':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .07;
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .07;
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 7;
       }
       break;
     case '8':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .08;
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .08;
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 8;
       }
       break;
     case '9':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .09;
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .09;
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 9;
       }
       break;
     case '0':
-      if(bPage == 0 || bPage == 4 && bEditMode == true)
+      if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        fTemp = fTemp * 10 + .00;
+        if(bEditMode == f)
+          fTemp = fTemp * 10 + .00;
+        if(bEditMode == i)
+          bTemp = bTemp * 10 + 0;
       }
       break;
     case 'a':
-      //Can't change pages when you are editing
-      if(bEditMode && bPage == 3)
+      //if we are in edit mode
+      if(bEditMode)
       {
-        bEditMode = (++bEditMode % 2) + 1;
-        lcd.clear();
+        if(bPage == 3)
+        {
+          bEditWhat = bEditWhat == i ? f : i;
+          lcd.clear();
+          Serial.print("bEditWhat is now ");
+          Serial.println(bEditWhat, DEC);
+        }
       }
-      else
+      else //Can't change pages when you are editing
       {
         bPage = (bPage + 1) % 3;
         lcd.clear();
@@ -473,8 +520,14 @@ void buttonHandler(char key)
       //swap the current/active odometer
       //This means the one displayed on the LED display also the one affected by reset
       bCurrentOdo = (++bCurrentOdo % 3);
+      lcd.clear();
       break;
     case 'c':
+      if(bPage == 0 && bEditMode)
+      {
+        saveCalibration();
+      }
+      break;
     case 'd':
       resetCurrentOdo();
       break;
@@ -484,18 +537,20 @@ void buttonHandler(char key)
       if(bPage == 0 && bEditMode)
       {
         odo2.startDistance = fTemp;
-        fTemp = 0;
       }
-      if(bPage == 0 && bEditMode == f)
+      if(bPage == 3 && bEditMode)
       {
-        //odo2.startDistance = fTemp;
-        fTemp = 0;
+        if(bEditWhat == i)
+        {
+          bPpr = bTemp;
+        }
+        if(bEditWhat == f)
+        {
+          fTire = fTemp;
+        }
       }
-      if(bPage == 0 && bEditMode == i)
-      {
-        bPpr = bTemp;
-        bTemp = 0;
-      }
+      bTemp = 0;
+      fTemp = 0;
       bEditMode = !bEditMode;
       lcd.clear();
       break;
@@ -512,4 +567,36 @@ void buttonHandler(char key)
       }
       break;
   }
+}
+
+//This function should be called before we loose power to save the state of
+//the odo's so they can be recalled
+void shutdownHandler()
+{
+  //Save the current ulPulseCount and odo statuses
+  EEPROM_writeAnything(UL_PULSE_COUNT_LOC, ulPulseCount);
+  EEPROM_writeAnything(ODO_TOT_START_PULSES_LOC, odoTotal.startPulses);
+  EEPROM_writeAnything(ODO_1_START_PULSES_LOC, odo1.startPulses);
+  EEPROM_writeAnything(ODO_DWN_START_PULSES_LOC, odo2.startPulses);
+  EEPROM_writeAnything(ODO_DWN_START_DISTANCE_LOC, odo2.startDistance);
+  
+  //This is temporary untill I figure out more about the power supply, ie can I shut it off remotely, etc
+  lcd.clear();
+  lcd.print("Safe to shutdown");
+  while(true);
+}
+
+//This function will be called when the device first starts and
+//after we update any of the configurable persistant data
+void getPersitantData()
+{
+  bPpr = EEPROM.read(PPR_LOC); //Get the stored value for ppr
+  EEPROM_readAnything(TIRE_SIZE_LOC, fTire); //Get the stored value for the tire size
+  Serial.println("Getting pd fTire is: ");
+  Serial.println(fTire, DEC);
+  EEPROM_readAnything(LPULSECOUNT_LOC, ulPulseCount);
+  EEPROM_readAnything(ODO_TOT_START_PULSES_LOC, odoTotal.startPulses);
+  EEPROM_readAnything(ODO_1_START_PULSES_LOC, odo1.startPulses);
+  EEPROM_readAnything(ODO_DWN_START_PULSES_LOC, odo2.startPulses);
+  EEPROM_readAnything(ODO_DWN_START_DISTANCE_LOC, odo2.startDistance);
 }

@@ -114,6 +114,7 @@ void setup()
 {  
   pinMode(PULSE, INPUT);
   digitalWrite(PULSE, HIGH);
+  Serial.begin(9600);
   
   bCurrentOdo = 1; //Default odo
   bPage = 0;
@@ -130,7 +131,6 @@ void setup()
   digitalWrite(P, HIGH);
   digitalWrite(Q, HIGH);
   
-  Serial.begin(9600);
   lcd.begin(20,4);
   calDisplay();
   delay(2000); //Wait two seconds so the user can see the configuration data on the lcd screen
@@ -592,9 +592,7 @@ void getPersitantData()
 {
   bPpr = EEPROM.read(PPR_LOC); //Get the stored value for ppr
   EEPROM_readAnything(TIRE_SIZE_LOC, fTire); //Get the stored value for the tire size
-  Serial.println("Getting pd fTire is: ");
-  Serial.println(fTire, DEC);
-  EEPROM_readAnything(LPULSECOUNT_LOC, ulPulseCount);
+  EEPROM_readAnything(UL_PULSE_COUNT_LOC, ulPulseCount);
   EEPROM_readAnything(ODO_TOT_START_PULSES_LOC, odoTotal.startPulses);
   EEPROM_readAnything(ODO_1_START_PULSES_LOC, odo1.startPulses);
   EEPROM_readAnything(ODO_DWN_START_PULSES_LOC, odo2.startPulses);

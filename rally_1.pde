@@ -3,6 +3,9 @@
 #include <EEPROM_UTIL.h>
 #include <Keypad.h>
 
+#define MPH
+
+//used to let us know what data field we want to edit 
 enum { i, f};
 //The following structs define the two types of odo's
 //that will be used, countUp and countDown
@@ -25,7 +28,7 @@ struct countDown
 const unsigned PPR_LOC = 0; //pulse per revolutions
 const unsigned TIRE_SIZE_LOC = 4; //Tire size stored as a float packed into bytes
 const unsigned LPULSECOUNT_LOC = 8; //ulPulseCount is stored here when the unit is turned off, packed into bytes.
-//Locations of the data of the odo's this is so they can be persistant.
+//Locations of the data of the odo's this is so they can be persistant. That is exist across powercycles.
 const unsigned ODO_TOT_START_PULSES_LOC = 12;
 const unsigned ODO_1_START_PULSES_LOC = 16;
 const unsigned ODO_DWN_START_PULSES_LOC = 20;
@@ -33,7 +36,14 @@ const unsigned ODO_DWN_START_DISTANCE_LOC = 24;
 const unsigned UL_PULSE_COUNT_LOC = 28;
 
 //Some conversion values used in the program
-const unsigned INCH_IN_MILE = 63360;
+#ifdef MPH
+  #define DISTANCE_CONVERSION_FACTOR 63360 //Inches in a mile
+  #define PULSE_TIME_TO_SPEED 56818.1 //Conversion factor. Inches per uSec to MPH
+#endif
+#ifdef KPH
+  #define DISTANCE_CONVERSION_FACTOR 1000 //m in a Km
+  #define PULSE_TIME_TO_SPEED 2 //junk values so I'll know if I'm here FIX need to calculate this
+#endif
 const float pi = 3.14;
 
 //Pin values general
@@ -244,15 +254,15 @@ void updateLED(int odo)
   switch (odo)
   {
     case 0:
-      distance = ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / INCH_IN_MILE;
+      distance = ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / DISTANCE_CONVERSION_FACTOR;
       break;
     case 1:
       //Count up
-      distance = ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / INCH_IN_MILE;
+      distance = ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / DISTANCE_CONVERSION_FACTOR;
       break;
     case 2:
       //Count down
-      distance = odo2.startDistance - ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / INCH_IN_MILE;
+      distance = odo2.startDistance - ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / DISTANCE_CONVERSION_FACTOR;
       break;
   }
 }
@@ -285,11 +295,11 @@ void updateLCD()
       lcd.setCursor(0,0);
       lcd.print("ODO TOT:");
       lcd.setCursor(9,0);
-      lcd.print((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse / INCH_IN_MILE);
+      lcd.print((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR);
       lcd.setCursor(0,1);
       lcd.print("ODO   1:");
       lcd.setCursor(9,1);
-      lcd.print(((ulTempCount - odo1.startPulses) * fDistancePerPulse / INCH_IN_MILE));
+      lcd.print(((ulTempCount - odo1.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR));
       lcd.setCursor(0,2);
       lcd.print("ODO DWN:");
       if (bEditMode)
@@ -303,7 +313,7 @@ void updateLCD()
         lcd.setCursor(9,2);
         //Do I want to count down here, or only on the led?
         //        lcd.print(odo2.startDistance);
-        lcd.print(odo2.startDistance - ((ulTempCount - odo2.startPulses) * fDistancePerPulse / INCH_IN_MILE));
+        lcd.print(odo2.startDistance - ((ulTempCount - odo2.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR));
       }
       lcd.setCursor(13, bCurrentOdo);
       lcd.print("@");
@@ -368,13 +378,8 @@ void updateLCD()
 //Calculates the current speed with pulse time given in microseconds
 //returns speed in mph
 int calcCurrentSpeed(long pt)
-{
-  //56818.1 is a magic number
-  //It is the conversion factor from inches/uSec to mph
-  //20.8 is tire circumfrance / ppr
-  //should calc this!
-  //return ((20.8/pt)*56818.1);
-  return ((fDistancePerPulse/pt)*56818.1);
+{  
+  return ((fDistancePerPulse/pt)*PULSE_TIME_TO_SPEED);
 }
 
 //Uses prompts to get data from the user and then
@@ -386,6 +391,8 @@ void saveCalibration()
   EEPROM_writeAnything(TIRE_SIZE_LOC, fTire);
   lcd.clear();
   lcd.print("Calibration saved");
+  delay(1000);
+  lcd.clear();
 }
 
 void buttonHandler(char key)
@@ -395,10 +402,14 @@ void buttonHandler(char key)
     case '1':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
-          fTemp = fTemp * 10 + .01;  
-        if(bEditMode == i)
+        if(bEditWhat == f)
+        {
+          fTemp = fTemp * 10 + .01; 
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 1;   
+        }
       }
       if(bPage == 2 && bEditMode == true)
       {
@@ -410,10 +421,14 @@ void buttonHandler(char key)
     case '2':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
+        if(bEditWhat == f)
+        {
           fTemp = fTemp * 10 + .02;
-        if(bEditMode == i)
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 2;
+        }
       }
       if(bPage == 2 && bEditMode == true)
       {
@@ -424,10 +439,14 @@ void buttonHandler(char key)
     case '3':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
+        if(bEditWhat == f)
+        {
           fTemp = fTemp * 10 + .03;
-        if(bEditMode == i)
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 3;
+        }
       }
       if(bPage == 2 && bEditMode == true)
       {
@@ -438,64 +457,92 @@ void buttonHandler(char key)
     case '4':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
+        if(bEditWhat == f)
+        {
           fTemp = fTemp * 10 + .04;
-        if(bEditMode == i)
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 4;
+        }
       }
       break;
     case '5':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
+        if(bEditWhat == f)
+        {
           fTemp = fTemp * 10 + .05;
-        if(bEditMode == i)
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 5;
+        }
       }
       break;
     case '6':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
+        if(bEditWhat == f)
+        {
           fTemp = fTemp * 10 + .06;
-        if(bEditMode == i)
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 6;
+        }
       }
       break;
     case '7':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
+        if(bEditWhat == f)
+        {
           fTemp = fTemp * 10 + .07;
-        if(bEditMode == i)
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 7;
+        }
       }
       break;
     case '8':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
+        if(bEditWhat == f)
+        {
           fTemp = fTemp * 10 + .08;
-        if(bEditMode == i)
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 8;
+        }
       }
       break;
     case '9':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
+        if(bEditWhat == f)
+        {
           fTemp = fTemp * 10 + .09;
-        if(bEditMode == i)
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 9;
+        }
       }
       break;
     case '0':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditMode == f)
+        if(bEditWhat == f)
+        {
           fTemp = fTemp * 10 + .00;
-        if(bEditMode == i)
+        }
+        if(bEditWhat == i)
+        {
           bTemp = bTemp * 10 + 0;
+        }
       }
       break;
     case 'a':
@@ -523,9 +570,11 @@ void buttonHandler(char key)
       lcd.clear();
       break;
     case 'c':
-      if(bPage == 0 && bEditMode)
+      if(bPage == 3 && bEditMode)
       {
         saveCalibration();
+        bEditMode = !bEditMode;
+        bEditWhat = f;
       }
       break;
     case 'd':

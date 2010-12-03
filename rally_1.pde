@@ -285,7 +285,7 @@ void updateLCD()
   //Page 2
   //1: Configuration
   //2: Master Reset
-  //3: Don't know if these will be useful
+  //3: Shutdown
   //4: Ditto
   switch(bPage)
   {

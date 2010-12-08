@@ -2,26 +2,30 @@
 #include <EEPROM.h>
 #include <EEPROM_UTIL.h>
 #include <Keypad.h>
+#include <SevenSegment.h>
 
 #define MPH
 
 //used to let us know what data field we want to edit 
 enum { i, f};
-//The following structs define the two types of odo's
+//The following classes define the two types of odo's
 //that will be used, countUp and countDown
 //countUp will count up from 0
-struct countUp
+class countUp
 {
+  public:
   unsigned long startPulses;
+  float calcDistance(unsigned long ulCount);
 };
 
 //countDown will be the same as countup
 //With the addition of the startDistance field
 //This will be used as a countdown timer.
-struct countDown
+class countDown: public countUp
 {
-  unsigned long startPulses;
+  public:
   float startDistance;
+  float calcDistanceLeft(unsigned long ulCount);
 };
 
 //Locations of the calibration values in EEPROM
@@ -100,7 +104,7 @@ byte bTemp; //used as a temp accumlator
 byte bCurrentOdo; //Which is the current odo we have selected
 byte bPage; //Which is the current lcd data page we want to display
 byte bEditMode; //Used to indicate if we want to edit data on the lcd screen
-byte bEditWhat; //Used to indicate what we want to edit, if there is more than 1 editable field on the page
+byte bEditSelection; //Used to indicate what we want to edit, if there is more than 1 editable field on the page
 byte bCurSpeed; //I've alrealy forgotten what this was for.
 volatile unsigned long ulOldMicros;
 volatile unsigned int uiPulseInt;
@@ -144,10 +148,6 @@ void setup()
   lcd.begin(20,4);
   calDisplay();
   delay(2000); //Wait two seconds so the user can see the configuration data on the lcd screen
-  
-  //The following is an idea that may happen, may scrap the wii nunchuck and go with a matrix keypad.
-  //Init the wii nunchuck and check to see if the z 
-  //button is held down, if so go into the calibration menu
   
   //Attach the interupt handlers. We do this last so no interupts occur while we are setting up the system.
   attachInterrupt(1, pulseHandler, FALLING);
@@ -295,11 +295,13 @@ void updateLCD()
       lcd.setCursor(0,0);
       lcd.print("ODO TOT:");
       lcd.setCursor(9,0);
-      lcd.print((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR);
+      //lcd.print((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR);
+      lcd.print(odoTotal.calcDistance(ulTempCount));
       lcd.setCursor(0,1);
       lcd.print("ODO   1:");
       lcd.setCursor(9,1);
-      lcd.print(((ulTempCount - odo1.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR));
+      //lcd.print(((ulTempCount - odo1.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR));
+      lcd.print(odo1.calcDistance(ulTempCount));
       lcd.setCursor(0,2);
       lcd.print("ODO DWN:");
       if (bEditMode)
@@ -313,7 +315,8 @@ void updateLCD()
         lcd.setCursor(9,2);
         //Do I want to count down here, or only on the led?
         //        lcd.print(odo2.startDistance);
-        lcd.print(odo2.startDistance - ((ulTempCount - odo2.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR));
+        //lcd.print(odo2.startDistance - ((ulTempCount - odo2.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR));
+        lcd.print(odo2.calcDistanceLeft(ulTempCount));
       }
       lcd.setCursor(13, bCurrentOdo);
       lcd.print("@");
@@ -346,7 +349,7 @@ void updateLCD()
       lcd.setCursor(0,0);
       lcd.print("Pulses per rev:");
       lcd.setCursor(15,0);
-      if(bEditWhat == i && bEditMode)
+      if(bEditSelection == i && bEditMode)
       {
         lcd.print("^");
         lcd.print(bTemp, DEC);
@@ -359,7 +362,7 @@ void updateLCD()
       lcd.setCursor(0,1);
       lcd.print("Tire diameter:");
       lcd.setCursor(14,1);
-      if(bEditWhat == f && bEditMode)
+      if(bEditSelection == f && bEditMode)
       {
         lcd.print("^");
         lcd.print(fTemp);
@@ -402,11 +405,11 @@ void buttonHandler(char key)
     case '1':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .01; 
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 1;   
         }
@@ -421,11 +424,11 @@ void buttonHandler(char key)
     case '2':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .02;
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 2;
         }
@@ -439,11 +442,11 @@ void buttonHandler(char key)
     case '3':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .03;
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 3;
         }
@@ -457,11 +460,11 @@ void buttonHandler(char key)
     case '4':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .04;
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 4;
         }
@@ -470,11 +473,11 @@ void buttonHandler(char key)
     case '5':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .05;
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 5;
         }
@@ -483,11 +486,11 @@ void buttonHandler(char key)
     case '6':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .06;
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 6;
         }
@@ -496,11 +499,11 @@ void buttonHandler(char key)
     case '7':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .07;
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 7;
         }
@@ -509,11 +512,11 @@ void buttonHandler(char key)
     case '8':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .08;
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 8;
         }
@@ -522,11 +525,11 @@ void buttonHandler(char key)
     case '9':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .09;
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 9;
         }
@@ -535,11 +538,11 @@ void buttonHandler(char key)
     case '0':
       if(bPage == 0 || bPage == 3 && bEditMode == true)
       {
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTemp = fTemp * 10 + .00;
         }
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bTemp = bTemp * 10 + 0;
         }
@@ -551,10 +554,10 @@ void buttonHandler(char key)
       {
         if(bPage == 3)
         {
-          bEditWhat = bEditWhat == i ? f : i;
+          bEditSelection = bEditSelection == i ? f : i;
           lcd.clear();
-          Serial.print("bEditWhat is now ");
-          Serial.println(bEditWhat, DEC);
+          Serial.print("bEditSelection is now ");
+          Serial.println(bEditSelection, DEC);
         }
       }
       else //Can't change pages when you are editing
@@ -574,7 +577,7 @@ void buttonHandler(char key)
       {
         saveCalibration();
         bEditMode = !bEditMode;
-        bEditWhat = f;
+        bEditSelection = f;
       }
       break;
     case 'd':
@@ -589,11 +592,11 @@ void buttonHandler(char key)
       }
       if(bPage == 3 && bEditMode)
       {
-        if(bEditWhat == i)
+        if(bEditSelection == i)
         {
           bPpr = bTemp;
         }
-        if(bEditWhat == f)
+        if(bEditSelection == f)
         {
           fTire = fTemp;
         }
@@ -646,4 +649,14 @@ void getPersitantData()
   EEPROM_readAnything(ODO_1_START_PULSES_LOC, odo1.startPulses);
   EEPROM_readAnything(ODO_DWN_START_PULSES_LOC, odo2.startPulses);
   EEPROM_readAnything(ODO_DWN_START_DISTANCE_LOC, odo2.startDistance);
+}
+
+float  inline countUp::calcDistance(unsigned long ulCount)
+{
+  return ((ulCount - startPulses) * fDistancePerPulse) / DISTANCE_CONVERSION_FACTOR;
+}
+
+float  inline countDown::calcDistanceLeft(unsigned long ulCount)
+{
+  return startDistance - ((ulCount - startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR);
 }

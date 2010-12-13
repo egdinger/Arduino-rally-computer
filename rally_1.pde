@@ -46,7 +46,7 @@ const unsigned UL_PULSE_COUNT_LOC = 28;
 #endif
 #ifdef KPH
   #define DISTANCE_CONVERSION_FACTOR 1000 //m in a Km
-  #define PULSE_TIME_TO_SPEED 2 //junk values so I'll know if I'm here FIX need to calculate this
+  #define PULSE_TIME_TO_SPEED 91439.86 //Not sure if this correct, need to eval later.
 #endif
 const float pi = 3.14;
 
@@ -416,7 +416,6 @@ void saveCalibration()
 
 void buttonHandler(char key)
 {
-  Serial.println(key);
   switch (key)
   {
     case '1':
@@ -619,6 +618,7 @@ void buttonHandler(char key)
       bTemp = 0;
       fTemp = 0;
       bEditMode = !bEditMode;
+      bEditSelection = f;
       lcd.clear();
       break;
     case '*':

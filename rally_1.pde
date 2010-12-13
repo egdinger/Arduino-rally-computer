@@ -53,22 +53,24 @@ const float pi = 3.14;
 //Pin values general
 const int PULSE = 3; //Needs to be on an interupt pin
 //Pin values for lcd
-const int rs = 4;
-const int enable = 5;
-const int d4 = 6;
-const int d5 = 7;
-const int d6 = 8;
-const int d7 = 9;
+const int rs = 19;
+const int en = 18;
+const int d4 = 16;
+const int d5 = 17;
+const int d6 = 14;
+const int d7 = 15;
 // pin values for matrix keypad
 //These are named funny because thats what they are labeled on the keypad
 //I'm using a greyhill 87BB3-201
-const int D = 18;
-const int E = 19;
-const int P = 16;
-const int Q = 17;
-const int M = 14;
-const int N = 15;const int G = 12;
-const int F = 13;
+
+const int D = 9;
+const int E = 10;
+const int P = 11;
+const int Q = 12;
+const int M = 6;
+const int N = 5;
+const int G = 7;
+const int F = 8;
 
 
 const byte ROWS = 4; //four rows
@@ -101,15 +103,20 @@ float fTire; //Tire diameter, read from the eeprom
 float fCirc; //calc'ed
 float fTemp; //used as a temp accumulator
 byte bTemp; //used as a temp accumlator
+volatile unsigned long ulOldMicros;
+volatile unsigned int uiPulseInt;
+
+//These are state variables. Together they contain the state of the menu's and displays.
 byte bCurrentOdo; //Which is the current odo we have selected
 byte bPage; //Which is the current lcd data page we want to display
 byte bEditMode; //Used to indicate if we want to edit data on the lcd screen
 byte bEditSelection; //Used to indicate what we want to edit, if there is more than 1 editable field on the page
-byte bCurSpeed; //I've alrealy forgotten what this was for.
-volatile unsigned long ulOldMicros;
-volatile unsigned int uiPulseInt;
 
-LiquidCrystal lcd(4, 5, 6, 7, 8, 9);
+
+byte bCurSpeed; //I've alrealy forgotten what this was for. It looks like I'm not using it anywhere, investigate the impact of removing it
+
+
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 
 //Function definitions, look below for more extensive documentation
@@ -123,6 +130,7 @@ int calcCurrentSpeed(long pt);
 void buttonHandler(char key);
 void shutdownHandler();
 void getPersitantData();
+void calcTireDetails();
 
 void setup()
 {  
@@ -136,9 +144,7 @@ void setup()
   getPersitantData();
   ulOldMicros = micros();
   
-  //Calculate the tire circumfrance and the distance per pulse
-  fCirc = fTire * pi;
-  fDistancePerPulse = fCirc/bPpr;
+  calcTireDetails();
   
   digitalWrite(D, HIGH);
   digitalWrite(E, HIGH);
@@ -207,7 +213,6 @@ void pulseHandler()
 //Resets the current odo
 void resetCurrentOdo()
 {
-  Serial.println("in reset");
   switch (bCurrentOdo)
   {
     case 0:
@@ -215,15 +220,16 @@ void resetCurrentOdo()
       break;
     case 1: //ODO1
       cli();
-      Serial.println(odo1.startPulses, DEC);
       odo1.startPulses = ulPulseCount;
-      Serial.println(odo1.startPulses, DEC);
       sei();
       break;
     case 2: //odo 2
       cli();
       odo2.startPulses = ulPulseCount;
       sei();
+      break;
+    default:
+      //Undefined/shouldn't have got here. So do nothing.
       break;
   }
 }
@@ -250,19 +256,25 @@ void updateLED(int odo)
 {
   //Compute the distance traveled
   float distance;
-  int tPulseCount;
+  cli();
+  unsigned long ulTempPulseCount = ulPulseCount;
+  sei();
   switch (odo)
   {
     case 0:
-      distance = ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / DISTANCE_CONVERSION_FACTOR;
+      distance = odoTotal.calcDistance(ulTempPulseCount);
       break;
     case 1:
       //Count up
-      distance = ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / DISTANCE_CONVERSION_FACTOR;
+      distance = odo1.calcDistance(ulTempPulseCount);
       break;
     case 2:
       //Count down
-      distance = odo2.startDistance - ((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse) / DISTANCE_CONVERSION_FACTOR;
+      distance = odo2.calcDistanceLeft(ulTempPulseCount);
+      break;
+    default:
+      //Shouldn't have got here display error code.
+      distance = -99;
       break;
   }
 }
@@ -372,6 +384,9 @@ void updateLCD()
         lcd.print(fTire);
       }
       break;
+    default:
+      lcd.print("Error -99");
+      break;    
   }
   //Do I want to display the current speed here all the time?
   lcd.setCursor(0,3);
@@ -392,6 +407,7 @@ void saveCalibration()
 {
   EEPROM.write(PPR_LOC, bPpr);
   EEPROM_writeAnything(TIRE_SIZE_LOC, fTire);
+  calcTireDetails();
   lcd.clear();
   lcd.print("Calibration saved");
   delay(1000);
@@ -400,6 +416,7 @@ void saveCalibration()
 
 void buttonHandler(char key)
 {
+  Serial.println(key);
   switch (key)
   {
     case '1':
@@ -556,8 +573,6 @@ void buttonHandler(char key)
         {
           bEditSelection = bEditSelection == i ? f : i;
           lcd.clear();
-          Serial.print("bEditSelection is now ");
-          Serial.println(bEditSelection, DEC);
         }
       }
       else //Can't change pages when you are editing
@@ -573,7 +588,7 @@ void buttonHandler(char key)
       lcd.clear();
       break;
     case 'c':
-      if(bPage == 3 && bEditMode)
+      if(bPage == 3 && !bEditMode)
       {
         saveCalibration();
         bEditMode = !bEditMode;
@@ -618,7 +633,12 @@ void buttonHandler(char key)
          lcd.clear();
       }
       break;
-  }
+      default:
+        lcd.print("Invalid input character. Internal error");
+        Serial.print("Invalid input character: ");
+        Serial.print(key);
+        Serial.print("Please take to service!");
+      }
 }
 
 //This function should be called before we loose power to save the state of
@@ -651,11 +671,20 @@ void getPersitantData()
   EEPROM_readAnything(ODO_DWN_START_DISTANCE_LOC, odo2.startDistance);
 }
 
+void calcTireDetails()
+{
+  //Calculate the tire circumfrance and the distance per pulse
+  fCirc = fTire * pi;
+  fDistancePerPulse = fCirc/bPpr;
+};
+
+//Calculates the distance traveled.
 float  inline countUp::calcDistance(unsigned long ulCount)
 {
   return ((ulCount - startPulses) * fDistancePerPulse) / DISTANCE_CONVERSION_FACTOR;
 }
 
+//Calculates the distance remaining till we have traveled the distance held in startDistance
 float  inline countDown::calcDistanceLeft(unsigned long ulCount)
 {
   return startDistance - ((ulCount - startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR);

@@ -104,7 +104,7 @@ float fCirc; //calc'ed
 float fTemp; //used as a temp accumulator
 byte bTemp; //used as a temp accumlator
 volatile unsigned long ulOldMicros;
-volatile unsigned int uiPulseInt;
+volatile unsigned long uiPulseInt;
 
 //These are state variables. Together they contain the state of the menu's and displays.
 byte bCurrentOdo; //Which is the current odo we have selected
@@ -618,6 +618,8 @@ void buttonHandler(char key)
       bTemp = 0;
       fTemp = 0;
       bEditMode = !bEditMode;
+      //This assumes that any page with an edit field has a float edit field.
+      //May need to update if this no longer is true.
       bEditSelection = f;
       lcd.clear();
       break;

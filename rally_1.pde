@@ -49,28 +49,31 @@ const unsigned UL_PULSE_COUNT_LOC = 28;
   #define PULSE_TIME_TO_SPEED 91439.86 //Not sure if this correct, need to eval later.
 #endif
 const float pi = 3.14;
+const byte MAX_DIGITS = 4;
 
 //Pin values general
-const int PULSE = 3; //Needs to be on an interupt pin
+const byte PULSE = 3; //Needs to be on an interupt pin
+//Pin values for LED display
+const byte dataPin = 13;
+const byte clockPin = 4;
 //Pin values for lcd
-const int rs = 19;
-const int en = 18;
-const int d4 = 16;
-const int d5 = 17;
-const int d6 = 14;
-const int d7 = 15;
+const byte rs = 19;
+const byte en = 18;
+const byte d4 = 16;
+const byte d5 = 17;
+const byte d6 = 14;
+const byte d7 = 15;
 // pin values for matrix keypad
 //These are named funny because thats what they are labeled on the keypad
 //I'm using a greyhill 87BB3-201
-
-const int D = 9;
-const int E = 10;
-const int P = 11;
-const int Q = 12;
-const int M = 6;
-const int N = 5;
-const int G = 7;
-const int F = 8;
+const byte D = 9;
+const byte E = 10;
+const byte P = 11;
+const byte Q = 12;
+const byte M = 6;
+const byte N = 5;
+const byte G = 7;
+const byte F = 8;
 
 
 const byte ROWS = 4; //four rows
@@ -118,6 +121,7 @@ byte bCurSpeed; //I've alrealy forgotten what this was for. It looks like I'm no
 
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
+SevenSegment led = SevenSegment(dataPin, clockPin, MAX_DIGITS);
 
 //Function definitions, look below for more extensive documentation
 void pulseHandler();
@@ -167,7 +171,8 @@ void loop()
   if ((iDisplayCounter % 30) == 0) //Limit the refresh rate of the lcd
   {
     //update the LED
-    //updateLED(bCurrentOdo);
+    if((iDisplayCounter % 5) == 0)
+      updateLED(bCurrentOdo);
     //update the LCD
     updateLCD();
   }
@@ -262,15 +267,19 @@ void updateLED(int odo)
   switch (odo)
   {
     case 0:
-      distance = odoTotal.calcDistance(ulTempPulseCount);
+      //distance = odoTotal.calcDistance(ulTempPulseCount);
+      led.displayNum(odoTotal.calcDistance(ulTempPulseCount), 2, 1);
+      //distance, decimal place at 2 digits in, leading zero suppresed.
       break;
     case 1:
       //Count up
-      distance = odo1.calcDistance(ulTempPulseCount);
+      //distance = odo1.calcDistance(ulTempPulseCount);
+      led.displayNum(odo1.calcDistance(ulTempPulseCount), 2, 1);
       break;
     case 2:
       //Count down
-      distance = odo2.calcDistanceLeft(ulTempPulseCount);
+      //distance = odo2.calcDistanceLeft(ulTempPulseCount);
+      led.displayNum(odo2.calcDistanceLeft(ulTempPulseCount), 2, 1);
       break;
     default:
       //Shouldn't have got here display error code.

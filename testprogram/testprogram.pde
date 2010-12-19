@@ -1,48 +1,47 @@
-/*
-  Analog Input
- Demonstrates analog input by reading an analog sensor on analog pin 0 and
- turning on and off a light emitting diode(LED)  connected to digital pin 13. 
- The amount of time the LED will be on and off depends on
- the value obtained by analogRead(). 
- 
- The circuit:
- * Potentiometer attached to analog input 0
- * center pin of the potentiometer to the analog pin
- * one side pin (either one) to ground
- * the other side pin to +5V
- * LED anode (long leg) attached to digital output 13
- * LED cathode (short leg) attached to ground
- 
- * Note: because most Arduinos have a built-in LED attached 
- to pin 13 on the board, the LED is optional.
- 
- 
- Created by David Cuartielles
- Modified 4 Sep 2010
- By Tom Igoe
- 
- This example code is in the public domain.
- 
- http://arduino.cc/en/Tutorial/AnalogInput
- 
- */
+/* Test program for rally computer
+This test program simulates the output from a gear tooth hall effect switch,  uses a joystick to set the
+delay between pulses.
+
+This code is copy right Eric Dinger 2010.
+Feel free to use as is or modify to do what you want. Just give credit where credit is due.
+*/
+
+#include <math.h>
+
+const byte DEADBAND = 35;
 
 int sensorPin = A0;    // select the input pin for the potentiometer
-int sensorValue = 0;  // variable to store the value coming from the sensor
+int iDelayVal = 0;  // variable to store the value coming from the sensor
+int iDelta;
 byte outPin = 3;
+int iCenterVal;
+int iCurPulse;
 
 void setup() {
   // declare the ledPin as an OUTPUT:
   Serial.begin(9600);
   pinMode(outPin, OUTPUT);
+  iCenterVal = analogRead(sensorPin);
+  iCurPulse = 0;
+  iDelayVal = 600;
 }
 
 void loop() {
-  // read the value from the sensor:
-  sensorValue = analogRead(sensorPin);    
-  sensorValue *= 2;
-  Serial.println(sensorValue);
+  int counter = 0;
+  if((counter % 30) == 0)
+  {
+    iDelta = analogRead(sensorPin) - iCenterVal;    
+    Serial.print(iDelta);
+    if (iDelayVal > 0 && (iDelta > DEADBAND || iDelta < -DEADBAND))
+      iDelayVal += iDelta/10;
+    else if (iDelta > DEADBAND)
+      iDelayVal = 1;
+    Serial.print(" ");
+    Serial.println(iDelayVal);
+  }
+  counter++;
+  
   digitalWrite(outPin, HIGH);
-  delay(sensorValue);      
-  digitalWrite(outPin, LOW); 
+  delay(abs(iDelayVal));      
+  digitalWrite(outPin, LOW);
 }

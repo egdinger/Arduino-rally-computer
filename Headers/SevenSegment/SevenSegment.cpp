@@ -53,6 +53,8 @@ int SevenSegment::displayNum(double value, int dp, boolean lzsuppress) {
     else             negative = 0;
     if (negative) value = -value;
     fValue = modf(value,&iValue);
+	fValue += .005; //This is added so that the truncation on line 59 will behave like
+	//the rounding in the lcd and serial libraries.
     integerValue = (long) iValue;
     fractionValue = (long) (fValue * Pow10(dp));
     if (negative) {

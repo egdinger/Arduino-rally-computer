@@ -108,6 +108,7 @@ float fTemp; //used as a temp accumulator
 byte bTemp; //used as a temp accumlator
 volatile unsigned long ulOldMicros;
 volatile unsigned long uiPulseInt;
+volatile unsigned long ulTempPulseCount;
 
 //These are state variables. Together they contain the state of the menu's and displays.
 byte bCurrentOdo; //Which is the current odo we have selected
@@ -170,6 +171,9 @@ void loop()
   
   if ((iDisplayCounter % 30) == 0) //Limit the refresh rate of the lcd
   {
+    cli();
+    ulTempPulseCount = ulPulseCount;
+    sei();
     //update the LED
     if((iDisplayCounter % 5) == 0)
       updateLED(bCurrentOdo);
@@ -261,9 +265,9 @@ void updateLED(int odo)
 {
   //Compute the distance traveled
   float distance;
-  cli();
-  unsigned long ulTempPulseCount = ulPulseCount;
-  sei();
+  //cli();
+  //unsigned long ulTempPulseCount = ulPulseCount;
+  //sei();
   switch (odo)
   {
     case 0:
@@ -291,9 +295,9 @@ void updateLED(int odo)
 //Prints less important data to the lcd
 void updateLCD()
 {
-  cli();
-  unsigned long ulTempCount = ulPulseCount;
-  sei();
+  //cli();
+  //unsigned long ulTempCount = ulPulseCount;
+  //sei();
   
   //Using a 20x4 lcd will look something like
   //Page 0
@@ -316,13 +320,11 @@ void updateLCD()
       lcd.setCursor(0,0);
       lcd.print("ODO TOT:");
       lcd.setCursor(9,0);
-      //lcd.print((ulPulseCount - odoTotal.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR);
-      lcd.print(odoTotal.calcDistance(ulTempCount));
+      lcd.print(odoTotal.calcDistance(ulTempPulseCount));
       lcd.setCursor(0,1);
       lcd.print("ODO   1:");
       lcd.setCursor(9,1);
-      //lcd.print(((ulTempCount - odo1.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR));
-      lcd.print(odo1.calcDistance(ulTempCount));
+      lcd.print(odo1.calcDistance(ulTempPulseCount));
       lcd.setCursor(0,2);
       lcd.print("ODO DWN:");
       if (bEditMode)
@@ -336,8 +338,7 @@ void updateLCD()
         lcd.setCursor(9,2);
         //Do I want to count down here, or only on the led?
         //        lcd.print(odo2.startDistance);
-        //lcd.print(odo2.startDistance - ((ulTempCount - odo2.startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR));
-        lcd.print(odo2.calcDistanceLeft(ulTempCount));
+        lcd.print(odo2.calcDistanceLeft(ulTempPulseCount));
       }
       lcd.setCursor(13, bCurrentOdo);
       lcd.print("@");

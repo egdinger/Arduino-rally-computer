@@ -6,6 +6,15 @@
 
 #define MPH
 
+//Update the version when nessacery
+//The fourth char is the minor revision - change when cleaning up code / fixing a non-major bug
+//The 3rd char is the major revision - change when fixing a major bug or every 25 minor bugs
+//The 2nd char is the minor version - update when adding a small feature
+//The 1st char is the major version - update with a major overhual.
+//These really should only be update by one person, the branch owner, Eric Dinger. If you feel
+//That your contribution should increment one of these and it's not reflected take it up with him.
+const char VERSION[4] =  {'0','1','1','a'};
+
 //used to let us know what data field we want to edit 
 enum { i, f};
 //The following classes define the two types of odo's
@@ -158,6 +167,7 @@ void setup()
   
   lcd.begin(20,4);
   calDisplay();
+  led.displayChars(VERSION);
   delay(2000); //Wait two seconds so the user can see the configuration data on the lcd screen
   
   //Attach the interupt handlers. We do this last so no interupts occur while we are setting up the system.
@@ -202,10 +212,13 @@ void calDisplay()
   Serial.print("PPR: ");
   Serial.println(bPpr, DEC);
   lcd.setCursor(0,0);
-  //lcd.print("Tire Diameter: ");
+  lcd.print("Tire Dia: ");
   lcd.print(fTire);
   lcd.setCursor(0,1);
+  lcd.print("PPR: ");
   lcd.print(bPpr, DEC);
+  lcd.setCursor(0,2);
+  lcd.print(VERSION);
 }
 
 //

@@ -106,7 +106,7 @@ class SevenSegment {
     /* 
      * Display a set of ASCII characters
      */
-    void displayChars(byte theChars[]);
+    void displayChars(const char theChars[]);
     
     void debug();
 };

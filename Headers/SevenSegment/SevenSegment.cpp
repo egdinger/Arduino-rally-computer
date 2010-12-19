@@ -121,7 +121,7 @@ void SevenSegment::displayDigits(int theDigits[]) {
     segOutput(segments);   
 }    
  
-void SevenSegment::displayChars(byte theChars[]) {
+void SevenSegment::displayChars(const char theChars[]) {
     byte segments[NDIGITS];
 
     for (int i = 0; i < maxdigits; ++i) {

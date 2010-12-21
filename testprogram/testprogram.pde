@@ -33,6 +33,8 @@ void loop() {
     iDelta = analogRead(sensorPin) - iCenterVal;    
     Serial.print(iDelta);
     if (iDelayVal > 0 && (iDelta > DEADBAND || iDelta < -DEADBAND))
+      // Check if iDelayVal will be less than 0 after the subtaction
+      // if it is scale it further or something. Figure logic here later.
       iDelayVal += iDelta/10;
     else if (iDelta > DEADBAND)
       iDelayVal = 1;

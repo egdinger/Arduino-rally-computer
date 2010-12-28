@@ -1,7 +1,15 @@
 /*
   SevenSegment.h - A library for displaying numbers on a bank of 7-segment displays
                    connected to a bank of shift registers
-  Copyright (c) 2009 Jeff Kravitz
+  Original author: Jeff Kravitz
+  
+  Project: Arduino Rally Computer
+  Modifications by: Eric Dinger
+  
+  This version has been modified from Jeff Kravitz original version to be used in
+  a pin limited enviroment. The version uses only 2 pins, but loses control over
+  the brightness of the display, the ability to fade in/out and enable/disable the
+  display. It is still possible to blank the display using the blank characters.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public

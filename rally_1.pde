@@ -13,7 +13,7 @@
 //The 1st char is the major version - update with a major overhual.
 //These really should only be update by one person, the branch owner, Eric Dinger. If you feel
 //That your contribution should increment one of these and it's not reflected take it up with him.
-const char VERSION[4] =  {'0','1','1','a'};
+const char VERSION[4] =  {'0','1','1','b'};
 
 //used to let us know what data field we want to edit 
 enum { i, f};
@@ -414,6 +414,7 @@ void updateLCD()
   //Do I want to display the current speed here all the time?
   lcd.setCursor(0,3);
   lcd.print(calcCurrentSpeed(uiPulseInt), DEC);
+  lcd.print("   ");
 }
 
 //Calculates the current speed with pulse time given in microseconds

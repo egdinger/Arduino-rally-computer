@@ -169,6 +169,7 @@ void setup()
   calDisplay();
   led.displayChars(VERSION);
   delay(2000); //Wait two seconds so the user can see the configuration data on the lcd screen
+  lcd.clear();
   
   //Attach the interupt handlers. We do this last so no interupts occur while we are setting up the system.
   attachInterrupt(1, pulseHandler, FALLING);

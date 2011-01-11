@@ -13,7 +13,7 @@
 //The 1st char is the major version - update with a major overhual.
 //These really should only be update by one person, the branch owner, Eric Dinger. If you feel
 //That your contribution should increment one of these and it's not reflected take it up with him.
-const char VERSION[4] =  {'0','1','1','b'};
+const char VERSION[4] =  {'0','1','1','c'};
 
 //used to let us know what data field we want to edit 
 enum { i, f};

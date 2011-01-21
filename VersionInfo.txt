@@ -1,0 +1,6 @@
+Version info for Arduino rally computer
+011a: First numbered version
+011b: Fixed current speed bug.
+011c: Fixed Power on 50 displayed after totoal odo reading bug
+011d: Added error codes in the default cases, added a raw odo value output page for testings.
+      Refactored names in the menu and button state machines to make it more readable.

@@ -13,10 +13,13 @@
 //The 1st char is the major version - update with a major overhual.
 //These really should only be update by one person, the branch owner, Eric Dinger. If you feel
 //That your contribution should increment one of these and it's not reflected take it up with him.
-const char VERSION[4] =  {'0','1','1','c'};
+const char VERSION[4] =  {'0','1','1','d'};
 
 //used to let us know what data field we want to edit 
 enum { i, f};
+
+//This enum will define better names for menu pages
+enum {odo, debug, option, calibration, raw};
 //The following classes define the two types of odo's
 //that will be used, countUp and countDown
 //countUp will count up from 0
@@ -41,6 +44,7 @@ class countDown: public countUp
 const unsigned PPR_LOC = 0; //pulse per revolutions
 const unsigned TIRE_SIZE_LOC = 4; //Tire size stored as a float packed into bytes
 const unsigned LPULSECOUNT_LOC = 8; //ulPulseCount is stored here when the unit is turned off, packed into bytes.
+
 //Locations of the data of the odo's this is so they can be persistant. That is exist across powercycles.
 const unsigned ODO_TOT_START_PULSES_LOC = 12;
 const unsigned ODO_1_START_PULSES_LOC = 16;
@@ -239,7 +243,7 @@ void resetCurrentOdo()
   switch (bCurrentOdo)
   {
     case 0:
-      //Not resetable here
+      //Not resetable here - this is the total odo. Can only be reset with a master reset.
       break;
     case 1: //ODO1
       cli();
@@ -253,6 +257,8 @@ void resetCurrentOdo()
       break;
     default:
       //Undefined/shouldn't have got here. So do nothing.
+      lcd.clear();
+      lcd.print("Error 8");
       break;
   }
 }
@@ -301,7 +307,8 @@ void updateLED(int odo)
       break;
     default:
       //Shouldn't have got here display error code.
-      distance = -99;
+      lcd.clear();
+      lcd.print("Error 9");
       break;
   }
 }
@@ -325,10 +332,10 @@ void updateLCD()
   //1: Configuration
   //2: Master Reset
   //3: Shutdown
-  //4: Ditto
+  //4: raw odo values - for testing purposes.
   switch(bPage)
   {
-    case 0:
+    case odo:
       //The first page will display all of the available odo's and some information about them
       //Not sure if I want to display the count or what we want to count down from for count down
       lcd.setCursor(0,0);
@@ -357,7 +364,7 @@ void updateLCD()
       lcd.setCursor(13, bCurrentOdo);
       lcd.print("@");
       break;
-    case 1:
+    case debug:
       lcd.setCursor(0,0);
       lcd.print("Debug Stuff:");
       lcd.setCursor(0,1);
@@ -367,7 +374,7 @@ void updateLCD()
       lcd.setCursor(14,2);
       lcd.print(bCurrentOdo, DEC);
       break;
-    case 2:
+    case option:
       lcd.setCursor(1,0);
       lcd.print("1: Configuration");
       lcd.setCursor(1,1);
@@ -380,7 +387,7 @@ void updateLCD()
         lcd.print("^");
       }
       break;
-    case 3:
+    case calibration:
       //The calibration menu
       lcd.setCursor(0,0);
       lcd.print("Pulses per rev:");
@@ -408,8 +415,15 @@ void updateLCD()
         lcd.print(fTire);
       }
       break;
+    case raw:
+      // This will display the first and last value that gets saved in the shutdown handler
+      // This is done so we can compare that they saved correctly.
+      lcd.println(ulPulseCount);
+      lcd.println(odo2.startDistance);
+      break;
     default:
-      lcd.print("Error -99");
+      lcd.clear();
+      lcd.print("Error 10");
       break;    
   }
   //Do I want to display the current speed here all the time?
@@ -444,7 +458,7 @@ void buttonHandler(char key)
   switch (key)
   {
     case '1':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -455,15 +469,15 @@ void buttonHandler(char key)
           bTemp = bTemp * 10 + 1;   
         }
       }
-      if(bPage == 2 && bEditMode == true)
+      if(bPage == option && bEditMode == true)
       {
-        bPage = 3;
+        bPage = calibration;
         bEditMode = !bEditMode;
         lcd.clear();
       }
       break;
     case '2':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -474,14 +488,14 @@ void buttonHandler(char key)
           bTemp = bTemp * 10 + 2;
         }
       }
-      if(bPage == 2 && bEditMode == true)
+      if(bPage == option && bEditMode == true)
       {
         masterReset();
         bEditMode = false;//!bEditMode;
       }
       break;
     case '3':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -492,14 +506,14 @@ void buttonHandler(char key)
           bTemp = bTemp * 10 + 3;
         }
       }
-      if(bPage == 2 && bEditMode == true)
+      if(bPage == option && bEditMode == true)
       {
         shutdownHandler();
         bEditMode = false;//!bEditMode;
       }
       break;
     case '4':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -512,7 +526,7 @@ void buttonHandler(char key)
       }
       break;
     case '5':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -525,7 +539,7 @@ void buttonHandler(char key)
       }
       break;
     case '6':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -538,7 +552,7 @@ void buttonHandler(char key)
       }
       break;
     case '7':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -551,7 +565,7 @@ void buttonHandler(char key)
       }
       break;
     case '8':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -564,7 +578,7 @@ void buttonHandler(char key)
       }
       break;
     case '9':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -577,7 +591,7 @@ void buttonHandler(char key)
       }
       break;
     case '0':
-      if(bPage == 0 || bPage == 3 && bEditMode == true)
+      if(bPage == odo || bPage == calibration && bEditMode == true)
       {
         if(bEditSelection == f)
         {
@@ -601,7 +615,8 @@ void buttonHandler(char key)
       }
       else //Can't change pages when you are editing
       {
-        bPage = (bPage + 1) % 3;
+        //The following line sets the total number of pages we can cycle through.
+        bPage = (bPage + 1) % 4;
         lcd.clear();
       }
       break;
@@ -661,9 +676,9 @@ void buttonHandler(char key)
       }
       break;
       default:
-        lcd.print("Invalid input character. Internal error");
+        lcd.println("Invalid input character. Internal error");
         Serial.print("Invalid input character: ");
-        Serial.print(key);
+        Serial.println(key);
         Serial.print("Please take to service!");
       }
 }
@@ -673,6 +688,8 @@ void buttonHandler(char key)
 void shutdownHandler()
 {
   //Save the current ulPulseCount and odo statuses
+  
+  //IF THE ORDER IS CHANGED MAKE SURE TO UPDATE PAGE 4!!!
   EEPROM_writeAnything(UL_PULSE_COUNT_LOC, ulPulseCount);
   EEPROM_writeAnything(ODO_TOT_START_PULSES_LOC, odoTotal.startPulses);
   EEPROM_writeAnything(ODO_1_START_PULSES_LOC, odo1.startPulses);

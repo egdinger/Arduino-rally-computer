@@ -66,6 +66,7 @@ const byte MAX_DIGITS = 4;
 
 //Pin values general
 const byte PULSE = 3; //Needs to be on an interupt pin
+const byte CLOCK_PIN = 99; //Need to set after next hardware revision.
 //Pin values for LED display
 const byte dataPin = 13;
 const byte clockPin = 4;
@@ -139,7 +140,6 @@ SevenSegment led = SevenSegment(dataPin, clockPin, MAX_DIGITS);
 
 //Function definitions, look below for more extensive documentation
 void pulseHandler();
-//void resetHandler();
 void calDisplay();
 void saveCalibration();
 void updateLED(int odo);
@@ -154,11 +154,15 @@ void setup()
 {  
   pinMode(PULSE, INPUT);
   digitalWrite(PULSE, HIGH);
+  //
+  //pinMode(CLOCK_PIN, INPUT);
+  //digitalWrite(CLOCK_PIN, HIGH);
   Serial.begin(9600);
   
   bCurrentOdo = 1; //Default odo
   bPage = 0;
   fTemp = .00;
+  bTemp = 0;
   getPersitantData();
   ulOldMicros = micros();
   
@@ -184,6 +188,9 @@ void loop()
   int iDisplayCounter = 0;
   char key;
   
+  //Not yet implemented
+  
+  
   if ((iDisplayCounter % 30) == 0) //Limit the refresh rate of the lcd
   {
     cli();
@@ -191,7 +198,19 @@ void loop()
     sei();
     //update the LED
     if((iDisplayCounter % 5) == 0)
-      updateLED(bCurrentOdo);
+    {
+      //Check if we want to display the clock
+      /*if (digitalRead(CLOCK_PIN) == LOW)
+      {
+         //Get time from where ever
+         //Display time on the LED
+         //LED.display("TIME");
+      }
+      else
+      {*/
+        updateLED(bCurrentOdo);
+      //}Uncomment after implementing the clock switch
+    }
     //update the LCD
     updateLCD();
   }
@@ -283,26 +302,18 @@ void masterReset()
 //writes it out to the LED display
 void updateLED(int odo)
 {
-  //Compute the distance traveled
-  float distance;
-  //cli();
-  //unsigned long ulTempPulseCount = ulPulseCount;
-  //sei();
   switch (odo)
   {
     case 0:
-      //distance = odoTotal.calcDistance(ulTempPulseCount);
-      led.displayNum(odoTotal.calcDistance(ulTempPulseCount), 2, 1);
       //distance, decimal place at 2 digits in, leading zero suppresed.
+      led.displayNum(odoTotal.calcDistance(ulTempPulseCount), 2, 1);
       break;
     case 1:
       //Count up
-      //distance = odo1.calcDistance(ulTempPulseCount);
       led.displayNum(odo1.calcDistance(ulTempPulseCount), 2, 1);
       break;
     case 2:
       //Count down
-      //distance = odo2.calcDistanceLeft(ulTempPulseCount);
       led.displayNum(odo2.calcDistanceLeft(ulTempPulseCount), 2, 1);
       break;
     default:
@@ -418,8 +429,10 @@ void updateLCD()
     case raw:
       // This will display the first and last value that gets saved in the shutdown handler
       // This is done so we can compare that they saved correctly.
-      lcd.println(ulPulseCount);
-      lcd.println(odo2.startDistance);
+      lcd.setCursor(0,0);
+      lcd.print(ulPulseCount);
+      lcd.setCursor(0,1);
+      lcd.print(odo2.startDistance);
       break;
     default:
       lcd.clear();
@@ -440,8 +453,7 @@ int calcCurrentSpeed(long pt)
 }
 
 //Uses prompts to get data from the user and then
-//saves it to eeprom
-//Currently does not get anything from user
+//saves it to eeprom using the locations defined at the begining of the file.
 void saveCalibration()
 {
   EEPROM.write(PPR_LOC, bPpr);
@@ -616,7 +628,7 @@ void buttonHandler(char key)
       else //Can't change pages when you are editing
       {
         //The following line sets the total number of pages we can cycle through.
-        bPage = (bPage + 1) % 4;
+        bPage = (bPage + 1) % 5;
         lcd.clear();
       }
       break;

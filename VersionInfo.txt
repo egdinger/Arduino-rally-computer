@@ -4,3 +4,5 @@ Version info for Arduino rally computer
 011c: Fixed Power on 50 displayed after totoal odo reading bug
 011d: Added error codes in the default cases, added a raw odo value output page for testings.
       Refactored names in the menu and button state machines to make it more readable.
+021d: Should have updated the feature space when adding the raw value menu page. Also reordered the menu pages so
+      debug and raw come last.

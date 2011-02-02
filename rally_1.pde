@@ -13,13 +13,13 @@
 //The 1st char is the major version - update with a major overhual.
 //These really should only be update by one person, the branch owner, Eric Dinger. If you feel
 //That your contribution should increment one of these and it's not reflected take it up with him.
-const char VERSION[4] =  {'0','1','1','d'};
+const char VERSION[4] =  {'0','2','1','d'};
 
 //used to let us know what data field we want to edit 
 enum { i, f};
 
 //This enum will define better names for menu pages
-enum {odo, debug, option, calibration, raw};
+enum {odo, option, calibration, debug, raw};
 //The following classes define the two types of odo's
 //that will be used, countUp and countDown
 //countUp will count up from 0
@@ -66,7 +66,9 @@ const byte MAX_DIGITS = 4;
 
 //Pin values general
 const byte PULSE = 3; //Needs to be on an interupt pin
-const byte CLOCK_PIN = 99; //Need to set after next hardware revision.
+const byte POWER = 99; //Needs to be on an interupt pin
+//Pin values
+const byte CLOCK_MODE_PIN = 99; //Need to set after next hardware revision.
 //Pin values for LED display
 const byte dataPin = 13;
 const byte clockPin = 4;
@@ -155,8 +157,8 @@ void setup()
   pinMode(PULSE, INPUT);
   digitalWrite(PULSE, HIGH);
   //
-  //pinMode(CLOCK_PIN, INPUT);
-  //digitalWrite(CLOCK_PIN, HIGH);
+  //pinMode(CLOCK_MODE_PIN, INPUT);
+  //digitalWrite(CLOCK_MODE_PIN, HIGH);
   Serial.begin(9600);
   
   bCurrentOdo = 1; //Default odo
@@ -200,7 +202,7 @@ void loop()
     if((iDisplayCounter % 5) == 0)
     {
       //Check if we want to display the clock
-      /*if (digitalRead(CLOCK_PIN) == LOW)
+      /*if (digitalRead(CLOCK_MODE_PIN) == LOW)
       {
          //Get time from where ever
          //Display time on the LED

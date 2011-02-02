@@ -704,6 +704,7 @@ void shutdownHandler()
   //Save the current ulPulseCount and odo statuses
   
   //IF THE ORDER IS CHANGED MAKE SURE TO UPDATE PAGE 4!!!
+  //PAGE 4 is raw.
   EEPROM_writeAnything(UL_PULSE_COUNT_LOC, ulPulseCount);
   EEPROM_writeAnything(ODO_TOT_START_PULSES_LOC, odoTotal.startPulses);
   EEPROM_writeAnything(ODO_1_START_PULSES_LOC, odo1.startPulses);
@@ -739,7 +740,10 @@ void calcTireDetails()
 //Calculates the distance traveled.
 float  inline countUp::calcDistance(unsigned long ulCount)
 {
-  return ((ulCount - startPulses) * fDistancePerPulse) / DISTANCE_CONVERSION_FACTOR;
+  //Investigate computing fDistancePerPulse / DISTANCE_CONVERSION_FACTOR into a 
+  //single varible to reduce the number of floating point calculations we have to 
+  //everytime we update the lcd/led screen.
+  return (ulCount - startPulses) * fDistancePerPulse / DISTANCE_CONVERSION_FACTOR;
 }
 
 //Calculates the distance remaining till we have traveled the distance held in startDistance

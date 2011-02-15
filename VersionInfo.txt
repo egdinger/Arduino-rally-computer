@@ -6,3 +6,5 @@ Version info for Arduino rally computer
       Refactored names in the menu and button state machines to make it more readable.
 021d: Should have updated the feature space when adding the raw value menu page. Also reordered the menu pages so
       debug and raw come last.
+121d: Hardware updated with i2c/spi lcd backpack. Code has some changes to reflect this. Now the LED display strobes when updated.
+      This is unacceptable, am looking into how to fix. Code is very hacky right now.

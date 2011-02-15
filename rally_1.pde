@@ -14,7 +14,7 @@
 //The 1st char is the major version - update with a major overhual.
 //These really should only be update by one person, the branch owner, Eric Dinger. If you feel
 //That your contribution should increment one of these and it's not reflected take it up with him.
-const char VERSION[4] =  {'0','3','1','d'};
+const char VERSION[4] =  {'1','2','1','d'};
 
 //used to let us know what data field we want to edit 
 enum { i, f};
@@ -74,6 +74,9 @@ const byte CLOCK_MODE_PIN = 99; //Need to set after next hardware revision.
 const byte dataPin = 13; 
 const byte clockPin = 4;
 //Pin values for lcd
+const byte SPI_CLK = 19;
+const byte SPI_DATA = 18;
+const byte LCD_CS = 17;
 /* Disabled to test the i2c backpack. DINGER
 const byte rs = 19; //A5
 const byte en = 18; //A4
@@ -90,10 +93,12 @@ A0
 A1
 //SPI clk
 A2
-//SPI data
+//mosi
 A3
-//CLOCK select button
+//miso
 A4
+//CLOCK select button
+A5
 */
 // pin values for matrix keypad
 //These are named funny because thats what they are labeled on the keypad
@@ -153,7 +158,7 @@ byte bCurSpeed; //I've alrealy forgotten what this was for. It looks like I'm no
 
 
 //LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
-LiquidCrystal lcd(0);
+LiquidCrystal lcd(SPI_DATA, SPI_CLK, LCD_CS);
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 SevenSegment led = SevenSegment(dataPin, clockPin, MAX_DIGITS);
 
@@ -200,24 +205,29 @@ void setup()
   
   //Attach the interupt handlers. We do this last so no interupts occur while we are setting up the system.
   attachInterrupt(1, pulseHandler, FALLING);
-  //attachInterupt(?, shutdownHandler, FALLING); Which pin?
+  //attachInterupt(0, shutdownHandler, FALLING); Which pin?
 }
-
+//Temp for testing
+unsigned long ulLcdPreviousTime = 0;
+unsigned long ulLedPreviousTime = 0;
+unsigned long ulCurrTime;
 void loop()
 {
-  int iDisplayCounter = 0;
   char key;
-  
+  ulCurrTime = millis();
   //Not yet implemented
   
   
-  if ((iDisplayCounter % 30) == 0) //Limit the refresh rate of the lcd
+  if ((ulCurrTime - ulLcdPreviousTime) >= 100) //Limit the refresh rate of the lcd
   {
     cli();
     ulTempPulseCount = ulPulseCount;
     sei();
-    //update the LED
-    if((iDisplayCounter % 5) == 0)
+    //update the LCD
+    updateLCD();
+    ulLcdPreviousTime = ulCurrTime;
+  }
+  if((ulCurrTime - ulLedPreviousTime) >= 100) //Limit th refresh rate of the led
     {
       //Check if we want to display the clock
       /*if (digitalRead(CLOCK_MODE_PIN) == LOW)
@@ -230,20 +240,19 @@ void loop()
       {*/
         updateLED(bCurrentOdo);
       //}Uncomment after implementing the clock switch
+      ulLedPreviousTime = ulCurrTime;
     }
-    //update the LCD
-    updateLCD();
-  }
   //check buttons
   key = keypad.getKey();
   
   if (key != NO_KEY){
+    Serial.println(key);
     buttonHandler(key);
   }
 
   //get current speed
   //Serial.print(calcCurrentSpeed(uiPulseInt));
-  iDisplayCounter++;
+  delay(50);
 }
 
 //Displays the values of the calibration data
@@ -322,6 +331,7 @@ void masterReset()
 //writes it out to the LED display
 void updateLED(int odo)
 {
+  Serial.println(odo, DEC);
   switch (odo)
   {
     case 0:

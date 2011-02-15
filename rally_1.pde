@@ -1,3 +1,4 @@
+#include <Wire.h>
 #include <LiquidCrystal.h>
 #include <EEPROM.h>
 #include <EEPROM_UTIL.h>
@@ -13,7 +14,7 @@
 //The 1st char is the major version - update with a major overhual.
 //These really should only be update by one person, the branch owner, Eric Dinger. If you feel
 //That your contribution should increment one of these and it's not reflected take it up with him.
-const char VERSION[4] =  {'0','2','1','d'};
+const char VERSION[4] =  {'0','3','1','d'};
 
 //used to let us know what data field we want to edit 
 enum { i, f};
@@ -70,15 +71,30 @@ const byte POWER = 99; //Needs to be on an interupt pin
 //Pin values
 const byte CLOCK_MODE_PIN = 99; //Need to set after next hardware revision.
 //Pin values for LED display
-const byte dataPin = 13;
+const byte dataPin = 13; 
 const byte clockPin = 4;
 //Pin values for lcd
-const byte rs = 19;
-const byte en = 18;
-const byte d4 = 16;
-const byte d5 = 17;
-const byte d6 = 14;
-const byte d7 = 15;
+/* Disabled to test the i2c backpack. DINGER
+const byte rs = 19; //A5
+const byte en = 18; //A4
+const byte d4 = 16; //A2
+const byte d5 = 17; //A3
+const byte d6 = 14; //A0
+const byte d7 = 15; //A1
+//Don't think I2C is going to work, too slow
+//The following is a test list of pins using spi
+//for the lcd and the rtc.
+//CS for lcd
+A0
+//CS for RTC
+A1
+//SPI clk
+A2
+//SPI data
+A3
+//CLOCK select button
+A4
+*/
 // pin values for matrix keypad
 //These are named funny because thats what they are labeled on the keypad
 //I'm using a greyhill 87BB3-201
@@ -136,7 +152,8 @@ byte bEditSelection; //Used to indicate what we want to edit, if there is more t
 byte bCurSpeed; //I've alrealy forgotten what this was for. It looks like I'm not using it anywhere, investigate the impact of removing it
 
 
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+//LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+LiquidCrystal lcd(0);
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 SevenSegment led = SevenSegment(dataPin, clockPin, MAX_DIGITS);
 
@@ -156,7 +173,7 @@ void setup()
 {  
   pinMode(PULSE, INPUT);
   digitalWrite(PULSE, HIGH);
-  //
+  //uncomment when I have the clock and button implmented
   //pinMode(CLOCK_MODE_PIN, INPUT);
   //digitalWrite(CLOCK_MODE_PIN, HIGH);
   Serial.begin(9600);
@@ -183,6 +200,7 @@ void setup()
   
   //Attach the interupt handlers. We do this last so no interupts occur while we are setting up the system.
   attachInterrupt(1, pulseHandler, FALLING);
+  //attachInterupt(?, shutdownHandler, FALLING); Which pin?
 }
 
 void loop()

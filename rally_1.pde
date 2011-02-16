@@ -14,7 +14,7 @@
 //The 1st char is the major version - update with a major overhual.
 //These really should only be update by one person, the branch owner, Eric Dinger. If you feel
 //That your contribution should increment one of these and it's not reflected take it up with him.
-const char VERSION[4] =  {'1','2','1','d'};
+const char VERSION[4] =  {'1','3','1','d'};
 
 //used to let us know what data field we want to edit 
 enum { i, f};
@@ -211,12 +211,15 @@ void setup()
 unsigned long ulLcdPreviousTime = 0;
 unsigned long ulLedPreviousTime = 0;
 unsigned long ulCurrTime;
+boolean bLedIsClock = false;
 void loop()
 {
   char key;
   ulCurrTime = millis();
   //Not yet implemented
   
+  //check buttons
+  key = keypad.getKey();
   
   if ((ulCurrTime - ulLcdPreviousTime) >= 100) //Limit the refresh rate of the lcd
   {
@@ -230,23 +233,21 @@ void loop()
   if((ulCurrTime - ulLedPreviousTime) >= 100) //Limit th refresh rate of the led
     {
       //Check if we want to display the clock
-      /*if (digitalRead(CLOCK_MODE_PIN) == LOW)
+      if (bLedIsClock)
       {
+        Serial.println("clock");
          //Get time from where ever
          //Display time on the LED
-         //LED.display("TIME");
+         led.displayChars("cloc");
       }
       else
-      {*/
+      {
         updateLED(bCurrentOdo);
-      //}Uncomment after implementing the clock switch
+      }
       ulLedPreviousTime = ulCurrTime;
-    }
-  //check buttons
-  key = keypad.getKey();
+    }  
   
   if (key != NO_KEY){
-    Serial.println(key);
     buttonHandler(key);
   }
 
@@ -331,7 +332,6 @@ void masterReset()
 //writes it out to the LED display
 void updateLED(int odo)
 {
-  Serial.println(odo, DEC);
   switch (odo)
   {
     case 0:
@@ -568,15 +568,22 @@ void buttonHandler(char key)
       }
       break;
     case '5':
-      if(bPage == odo || bPage == calibration && bEditMode == true)
+      if(!bEditMode)
       {
-        if(bEditSelection == f)
+        bLedIsClock = !bLedIsClock;
+      }
+      else //We're in edit mode
+      {
+        if(bPage == odo || bPage == calibration)
         {
-          fTemp = fTemp * 10 + .05;
-        }
-        if(bEditSelection == i)
-        {
-          bTemp = bTemp * 10 + 5;
+          if(bEditSelection == f)
+          {
+            fTemp = fTemp * 10 + .05;
+          }
+          if(bEditSelection == i)
+          {
+            bTemp = bTemp * 10 + 5;
+          }
         }
       }
       break;

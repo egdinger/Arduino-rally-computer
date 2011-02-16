@@ -8,3 +8,4 @@ Version info for Arduino rally computer
       debug and raw come last.
 121d: Hardware updated with i2c/spi lcd backpack. Code has some changes to reflect this. Now the LED display strobes when updated.
       This is unacceptable, am looking into how to fix. Code is very hacky right now.
+131d: Press 5 to switch the led display into clock display mode.

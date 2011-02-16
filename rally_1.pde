@@ -1,3 +1,7 @@
+//Copyright 2011 Eric Dinger
+//This code is currently under the license of do not sell, distribute, do not claim as your own, any changes have to go through me. 
+//But feel free to put it on your ardunio or what ever and play with it.
+
 #include <Wire.h>
 #include <LiquidCrystal.h>
 #include <EEPROM.h>
@@ -15,7 +19,7 @@
 //The 1st char is the major version - update with a major overhual.
 //These really should only be update by one person, the branch owner, Eric Dinger. If you feel
 //That your contribution should increment one of these and it's not reflected take it up with him.
-const char VERSION[4] =  {'1','3','2','e'};
+const char VERSION[4] =  {'1','3','2','f'};
 
 //Locations of the calibration values in EEPROM
 #define PPR_LOC 0
@@ -104,11 +108,6 @@ byte bPage; //Which is the current lcd data page we want to display
 byte bEditMode; //Used to indicate if we want to edit data on the lcd screen
 byte bEditSelection; //Used to indicate what we want to edit, if there is more than 1 editable field on the page
 
-
-byte bCurSpeed; //I've alrealy forgotten what this was for. It looks like I'm not using it anywhere, investigate the impact of removing it
-
-
-//LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 LiquidCrystal lcd(SPI_DATA, SPI_CLK, LCD_CS);
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 SevenSegment led = SevenSegment(dataPin, clockPin, MAX_DIGITS);
@@ -129,9 +128,7 @@ void setup()
 {  
   pinMode(PULSE, INPUT);
   digitalWrite(PULSE, HIGH);
-  //uncomment when I have the clock and button implmented
-  //pinMode(CLOCK_MODE_PIN, INPUT);
-  //digitalWrite(CLOCK_MODE_PIN, HIGH);
+  
   Serial.begin(9600);
   
   bCurrentOdo = 1; //Default odo
@@ -167,7 +164,6 @@ void loop()
 {
   char key;
   ulCurrTime = millis();
-  //Not yet implemented
   
   //check buttons
   key = keypad.getKey();
@@ -204,7 +200,6 @@ void loop()
 
   //get current speed
   //Serial.print(calcCurrentSpeed(uiPulseInt));
-  delay(50);
 }
 
 //Displays the values of the calibration data

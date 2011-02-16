@@ -11,3 +11,4 @@ Version info for Arduino rally computer
 131d: Press 5 to switch the led display into clock display mode.
 131e: Changed some of the const definitions to #define's
 132e: Moved the enums and odo struct definitions into a header tenativly called util.h
+132f: Cleaned up some unused variables. Added a basic License. Mainly changed becuase I didn't like the way g looked on the lcd

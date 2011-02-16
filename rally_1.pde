@@ -4,6 +4,7 @@
 #include <EEPROM_UTIL.h>
 #include <Keypad.h>
 #include <SevenSegment.h>
+#include <util.h>
 
 #define MPH
 
@@ -14,44 +15,19 @@
 //The 1st char is the major version - update with a major overhual.
 //These really should only be update by one person, the branch owner, Eric Dinger. If you feel
 //That your contribution should increment one of these and it's not reflected take it up with him.
-const char VERSION[4] =  {'1','3','1','d'};
-
-//used to let us know what data field we want to edit 
-enum { i, f};
-
-//This enum will define better names for menu pages
-enum {odo, option, calibration, debug, raw};
-//The following classes define the two types of odo's
-//that will be used, countUp and countDown
-//countUp will count up from 0
-class countUp
-{
-  public:
-  unsigned long startPulses;
-  float calcDistance(unsigned long ulCount);
-};
-
-//countDown will be the same as countup
-//With the addition of the startDistance field
-//This will be used as a countdown timer.
-class countDown: public countUp
-{
-  public:
-  float startDistance;
-  float calcDistanceLeft(unsigned long ulCount);
-};
+const char VERSION[4] =  {'1','3','2','e'};
 
 //Locations of the calibration values in EEPROM
-const unsigned PPR_LOC = 0; //pulse per revolutions
-const unsigned TIRE_SIZE_LOC = 4; //Tire size stored as a float packed into bytes
-const unsigned LPULSECOUNT_LOC = 8; //ulPulseCount is stored here when the unit is turned off, packed into bytes.
+#define PPR_LOC 0
+#define TIRE_SIZE_LOC 4 //Tire size stored as a float packed into bytes
+#define LPULSECOUNT_LOC 8 //ulPulseCount is stored here when the unit is turned off, packed into bytes.
 
 //Locations of the data of the odo's this is so they can be persistant. That is exist across powercycles.
-const unsigned ODO_TOT_START_PULSES_LOC = 12;
-const unsigned ODO_1_START_PULSES_LOC = 16;
-const unsigned ODO_DWN_START_PULSES_LOC = 20;
-const unsigned ODO_DWN_START_DISTANCE_LOC = 24;
-const unsigned UL_PULSE_COUNT_LOC = 28;
+#define ODO_TOT_START_PULSES_LOC 12
+#define ODO_1_START_PULSES_LOC 16
+#define ODO_DWN_START_PULSES_LOC 20
+#define ODO_DWN_START_DISTANCE_LOC 24
+#define UL_PULSE_COUNT_LOC 28
 
 //Some conversion values used in the program
 #ifdef MPH
@@ -63,58 +39,33 @@ const unsigned UL_PULSE_COUNT_LOC = 28;
   #define PULSE_TIME_TO_SPEED 91439.86 //Not sure if this correct, need to eval later.
 #endif
 const float pi = 3.14;
-const byte MAX_DIGITS = 4;
+#define MAX_DIGITS 4
 
 //Pin values general
-const byte PULSE = 3; //Needs to be on an interupt pin
-const byte POWER = 99; //Needs to be on an interupt pin
-//Pin values
-const byte CLOCK_MODE_PIN = 99; //Need to set after next hardware revision.
+#define PULSE 3 //Needs to be on an interupt pin - int 1
+#define POWER 2 //Needs to be on an interupt pin - int 0
 //Pin values for LED display
-const byte dataPin = 13; 
-const byte clockPin = 4;
+#define dataPin 13 
+#define clockPin 4
 //Pin values for lcd
-const byte SPI_CLK = 19;
-const byte SPI_DATA = 18;
-const byte LCD_CS = 17;
-/* Disabled to test the i2c backpack. DINGER
-const byte rs = 19; //A5
-const byte en = 18; //A4
-const byte d4 = 16; //A2
-const byte d5 = 17; //A3
-const byte d6 = 14; //A0
-const byte d7 = 15; //A1
-//Don't think I2C is going to work, too slow
-//The following is a test list of pins using spi
-//for the lcd and the rtc.
-//CS for lcd
-A0
-//CS for RTC
-A1
-//SPI clk
-A2
-//mosi
-A3
-//miso
-A4
-//CLOCK select button
-A5
-*/
+#define SPI_CLK 19
+#define SPI_DATA 18
+#define LCD_CS 17
 // pin values for matrix keypad
 //These are named funny because thats what they are labeled on the keypad
 //I'm using a greyhill 87BB3-201
-const byte D = 9;
-const byte E = 10;
-const byte P = 11;
-const byte Q = 12;
-const byte M = 6;
-const byte N = 5;
-const byte G = 7;
-const byte F = 8;
+#define D 9
+#define E 10
+#define P 11
+#define Q 12
+#define M 6
+#define N 5
+#define G 7
+#define F 8
 
 
-const byte ROWS = 4; //four rows
-const byte COLS = 4; //three columns
+#define ROWS 4 //four rows
+#define COLS 4 //three columns
 char keys[ROWS][COLS] = {
   {'1','2','3','a'},
   {'4','5','6','b'},
@@ -205,7 +156,7 @@ void setup()
   
   //Attach the interupt handlers. We do this last so no interupts occur while we are setting up the system.
   attachInterrupt(1, pulseHandler, FALLING);
-  //attachInterupt(0, shutdownHandler, FALLING); Which pin?
+  //attachInterupt(0, shutdownHandler, FALLING); //Currently not connect in hardware - do not enable pin is floating
 }
 //Temp for testing
 unsigned long ulLcdPreviousTime = 0;
